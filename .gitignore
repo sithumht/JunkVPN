@@ -26,3 +26,25 @@ out/
 target/
 bin/
 obj/
+
+# Gradle / Android
+.gradle/
+.kotlin/
+android/local.properties
+*.apk
+*.aab
+*.keystore
+captures/
+*.hprof
+
+# Native core artifact — rebuild with scripts/build-core.ps1
+android/app/libs/*.aar
+android/app/libs/*.jar
+
+# Go build/test output
+*.exe
+*.test
+*.out
+
+# Local toolchain drops (Go, Gradle, gopath) if unpacked inside the repo
+.toolchain/
