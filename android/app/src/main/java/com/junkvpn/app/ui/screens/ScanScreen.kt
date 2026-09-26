@@ -353,7 +353,7 @@ private fun ScanSummaryCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    ModeBadge(mode = "wg")
+                    ModeBadge(mode = state.results.firstOrNull { it.endpoint == summary.best }?.mode ?: "tcp")
                 }
                 TextButton(onClick = {
                     copyToClipboard(context, "Best endpoint", summary.best)
@@ -371,6 +371,13 @@ private fun ScanSummaryCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
             )
+            if (summary.handshakes == 0 && summary.best.isNotEmpty()) {
+                Text(
+                    text = "UDP is filtered on this network — latency comes from a TCP connect to port 443.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                )
+            }
         }
     }
 }
