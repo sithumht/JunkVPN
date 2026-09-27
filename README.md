@@ -100,6 +100,16 @@ The Go core exposes a small JSON-based API (`NewScan`, `RegisterAccount`,
 `BuildConfig`, `PresetConfig`) through gomobile; the Kotlin layer wraps it in
 coroutines and exposes one `StateFlow` per screen.
 
+## Install (alpha)
+
+Download the signed APK from the
+[Releases page](https://github.com/sithumht/JunkVPN/releases) and sideload it
+(`adb install …`, or open the file on the phone and allow installs from that
+source). Each release ships a SHA-256 checksum alongside the APK.
+
+Alpha = feature-complete but unproven at scale: expect rough edges and please
+file GitHub issues for anything that breaks.
+
 ## Building
 
 ### Prerequisites
@@ -123,8 +133,14 @@ coroutines and exposes one `StateFlow` per screen.
 ```powershell
 cd android
 ./gradlew :app:assembleDebug          # debug APK
-./gradlew :app:assembleRelease        # R8-minified, unsigned APK
+./gradlew :app:assembleRelease        # R8-minified release APK
 ```
+
+Release signing reads `android/keystore.properties` (gitignored) which points
+at a local keystore; when that file is missing (fresh clone) the release
+build falls back to the debug key so the project always produces an
+installable APK. **Back up the keystore** — without it existing installs can't
+be upgraded in place.
 
 The APK lands in `android/app/build/outputs/apk/`. To deploy to a connected
 device: `./gradlew :app:installDebug`.

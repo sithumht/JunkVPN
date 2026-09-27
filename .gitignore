@@ -31,9 +31,11 @@ obj/
 .gradle/
 .kotlin/
 android/local.properties
+android/keystore.properties
 *.apk
 *.aab
 *.keystore
+*.jks
 captures/
 *.hprof
 
