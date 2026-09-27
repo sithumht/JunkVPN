@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="#08080B" name="theme-color"/>
+<meta content="JunkVPN scans Cloudflare's WARP anycast ranges with real WireGuard handshakes, registers a WARP device even on blocked networks, and exports ready-to-import WireGuard / AmneziaWG configs. Android, open source, alpha." name="description"/>
+<meta content="JunkVPN — find your fastest Cloudflare WARP endpoint" property="og:title"/>
+<meta content="Real handshake scanning, three-layer blocked-network registration, one-tap WireGuard export. 100% local, no telemetry." property="og:description"/>
+<meta content="https://sithumht.github.io/JunkVPN/screenshots/scan.png" property="og:image"/>
+<meta content="website" property="og:type"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2308080b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2334e5a1' stroke-width='2' opacity='.45'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='none' stroke='%2334e5a1' stroke-width='2' opacity='.8'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%2334e5a1'/%3E%3C/svg%3E">
+<title>JunkVPN — High-Performance Cloudflare WARP Scanner &amp; Config Engine</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<!-- Tailwind Script -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-bright": "#39393c",
+            "tertiary-fixed": "#ffdbd0",
+            "surface-container-low": "#1b1b1f",
+            "on-primary-fixed-variant": "#005235",
+            "on-primary-fixed": "#002113",
+            "surface-container-highest": "#353438",
+            "error-container": "#93000a",
+            "on-primary-container": "#006241",
+            "tertiary": "#ffe0d7",
+            "on-error": "#690005",
+            "outline-variant": "#3c4a41",
+            "on-background": "#e5e1e6",
+            "on-primary": "#003824",
+            "tertiary-fixed-dim": "#ffb59e",
+            "on-surface-variant": "#bacabf",
+            "secondary-container": "#422db2",
+            "outline": "#85948a",
+            "on-tertiary-fixed": "#3a0b00",
+            "surface-container": "#201f23",
+            "secondary": "#c7bfff",
+            "surface-dim": "#131316",
+            "primary-fixed-dim": "#2ce19d",
+            "secondary-fixed-dim": "#c7bfff",
+            "on-secondary-fixed-variant": "#422db2",
+            "on-secondary-container": "#b4abff",
+            "inverse-primary": "#006c48",
+            "on-secondary-fixed": "#170065",
+            "on-tertiary-container": "#8e3b20",
+            "secondary-fixed": "#e4dfff",
+            "primary-fixed": "#57feb8",
+            "surface-tint": "#2ce19d",
+            "inverse-surface": "#e5e1e6",
+            "tertiary-container": "#ffbaa5",
+            "on-tertiary": "#5d1801",
+            "on-secondary": "#2a039d",
+            "on-surface": "#e5e1e6",
+            "on-tertiary-fixed-variant": "#7c2e13",
+            "surface-container-high": "#2a292d",
+            "inverse-on-surface": "#303034",
+            "primary-container": "#34e5a1",
+            "surface-container-lowest": "#0e0e11",
+            "primary": "#7affc1",
+            "surface-variant": "#353438",
+            "error": "#ffb4ab",
+            "background": "#08080B",
+            "surface": "#131318",
+            "on-error-container": "#ffdad6"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "2xl": "1rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-md": "1rem",
+            "space-sm": "0.5rem",
+            "margin": "3rem",
+            "space-lg": "1.5rem",
+            "gutter": "1.5rem",
+            "gutter-mobile": "1rem",
+            "space-xl": "2.5rem",
+            "margin-mobile": "1.25rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Space Grotesk", "sans-serif"],
+            "body-lg": ["Inter", "sans-serif"],
+            "label-code-md": ["JetBrains Mono", "monospace"],
+            "body-md": ["Inter", "sans-serif"],
+            "display-hero-mobile": ["Space Grotesk", "sans-serif"],
+            "body-sm": ["Inter", "sans-serif"],
+            "label-code-lg": ["JetBrains Mono", "monospace"],
+            "headline-xl-mobile": ["Space Grotesk", "sans-serif"],
+            "headline-xl": ["Space Grotesk", "sans-serif"],
+            "label-code-sm": ["JetBrains Mono", "monospace"],
+            "headline-sm": ["Space Grotesk", "sans-serif"],
+            "headline-lg": ["Space Grotesk", "sans-serif"],
+            "display-hero": ["Space Grotesk", "sans-serif"]
+          },
+          "fontSize": {
+            "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "500" }],
+            "body-lg": ["18px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-code-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "body-md": ["15px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }],
+            "display-hero-mobile": ["38px", { "lineHeight": "44px", "letterSpacing": "-0.03em", "fontWeight": "600" }],
+            "body-sm": ["13px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "label-code-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "headline-xl-mobile": ["32px", { "lineHeight": "38px", "letterSpacing": "-0.025em", "fontWeight": "600" }],
+            "headline-xl": ["48px", { "lineHeight": "54px", "letterSpacing": "-0.03em", "fontWeight": "600" }],
+            "label-code-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "headline-lg": ["32px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+            "display-hero": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.035em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .grid-bg {
+      background-size: 52px 52px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+    .specular-border {
+      position: relative;
+    }
+    .specular-border::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.02) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased overflow-x-hidden selection:bg-primary-container selection:text-surface-container-lowest">
+<!-- Ambient Subsurface Glows -->
+<div class="fixed top-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[140px] pointer-events-none -z-10 transform -translate-x-1/3 -translate-y-1/3"></div>
+<div class="fixed top-0 right-0 w-[650px] h-[650px] bg-secondary/6 rounded-full blur-[160px] pointer-events-none -z-10 transform translate-x-1/4 -translate-y-1/4"></div>
+<!-- 1. STICKY TRANSLUCENT NAV -->
+<header class="docked full-width top-0 sticky z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-none">
+<div class="flex justify-between items-center w-full px-6 md:px-12 max-w-7xl mx-auto h-16">
+<!-- Brand Anchor -->
+<a class="flex items-center gap-2.5 group" href="#">
+<div class="w-8 h-8 rounded-lg bg-surface-container border border-white/10 flex items-center justify-center text-primary group-hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-[18px]">radar</span>
+</div>
+<span class="text-headline-sm font-headline-sm font-semibold tracking-tight text-on-surface">JunkVPN</span>
+</a>
+<!-- Center Links -->
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors text-body-sm font-body-sm" href="#features">Features</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors text-body-sm font-body-sm" href="#blocked-networks">Blocked networks</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors text-body-sm font-body-sm" href="#how-it-works">How it works</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface transition-colors text-body-sm font-body-sm" href="#privacy">Privacy</a>
+</nav>
+<!-- Trailing Action Cluster -->
+<div class="flex items-center gap-3">
+<span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-code-sm font-label-code-sm bg-white/[0.04] border border-white/10 text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+          v0.1.0-alpha
+        </span>
+<a class="flex items-center gap-1.5 bg-gradient-to-r from-primary-container to-primary hover:opacity-95 text-[#08080B] font-body-sm font-semibold px-4 py-2 rounded-xl transition-transform active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]" href="#download">
+<span class="material-symbols-outlined text-[16px]">download</span>
+<span>Download</span>
+</a>
+</div>
+</div>
+</header>
+<!-- 2. HERO SECTION -->
+<section class="relative pt-16 md:pt-24 pb-20 border-b border-white/[0.06] grid-bg overflow-hidden">
+<!-- Radial overlay to soften grid edges -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#08080B]/70 to-[#08080B] pointer-events-none"></div>
+<div class="relative max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+<!-- Left Column Content -->
+<div class="lg:col-span-7 flex flex-col items-start space-y-6">
+<!-- Badge Pill -->
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-low border border-white/10 text-label-code-sm font-label-code-sm text-primary">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span>v0.1.0-alpha · public pre-release</span>
+</div>
+<!-- Headline -->
+<h1 class="text-headline-xl md:text-display-hero font-headline-xl md:font-display-hero tracking-tight text-white leading-tight">
+          Find your fastest WARP endpoint.
+          <span class="block bg-gradient-to-r from-primary via-[#60efff] to-secondary bg-clip-text text-transparent">
+            Even behind a firewall.
+          </span>
+</h1>
+<!-- Supporting Paragraph -->
+<p class="text-body-lg font-body-lg text-on-surface-variant max-w-xl">
+          Real WireGuard handshake scanning, three-layer blocked-network registration, and one-tap config export. Built natively with Go core and gomobile for zero overhead.
+        </p>
+<!-- CTA cluster -->
+<div class="flex flex-wrap items-center gap-4 pt-2">
+<a class="flex items-center gap-2 bg-gradient-to-r from-primary-container to-primary hover:opacity-95 text-[#08080B] font-semibold text-body-md font-body-md px-6 py-3.5 rounded-xl transition-transform active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]" href="#download">
+<span class="material-symbols-outlined text-[20px]">download</span>
+<span>Download alpha</span>
+</a>
+<a class="flex items-center gap-2 bg-white/[0.03] hover:bg-white/[0.08] text-white border border-white/10 font-body-md font-body-md px-5 py-3.5 rounded-xl transition-all" href="https://github.com/sithumht/JunkVPN" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[20px]">terminal</span>
+<span>Source code</span>
+</a>
+</div>
+<!-- Badges Row -->
+<div class="pt-6 flex flex-wrap gap-2 text-label-code-sm font-label-code-sm text-outline">
+<span class="px-2.5 py-1 rounded-md bg-[#131318] border border-white/[0.06]">Android 8.0+</span>
+<span class="px-2.5 py-1 rounded-md bg-[#131318] border border-white/[0.06]">MIT licensed</span>
+<span class="px-2.5 py-1 rounded-md bg-[#131318] border border-white/[0.06]">Go core · Kotlin UI</span>
+<span class="px-2.5 py-1 rounded-md bg-[#131318] border border-white/[0.06] text-primary/90">No telemetry</span>
+</div>
+</div>
+<!-- Right Column: Cropped Modern Phone Mockup (Top ~55% with lower fade) -->
+<div class="lg:col-span-5 relative flex justify-center items-start lg:justify-end">
+<!-- Atmospheric Phone Backlight -->
+<div class="absolute -top-10 w-72 h-72 bg-gradient-to-br from-primary/15 to-secondary/20 rounded-full blur-[80px] pointer-events-none"></div>
+<div class="relative w-[340px] sm:w-[380px] h-[410px] overflow-hidden">
+<!-- Secondary Phone (Underneath, tilted) -->
+<div class="absolute -right-4 top-4 w-[280px] h-[520px] rounded-[32px] bg-[#0c0c10] border border-white/10 p-3 opacity-40 transform rotate-6 pointer-events-none">
+<div class="w-full h-full rounded-[24px] bg-[#131318] border border-white/5 p-4">
+<div class="h-2 w-16 bg-white/20 rounded-full mx-auto mb-4"></div>
+<div class="space-y-3">
+<div class="h-10 bg-white/5 rounded-lg"></div>
+<div class="h-20 bg-white/5 rounded-lg"></div>
+</div>
+</div>
+</div>
+<!-- Primary Hero Phone (Cropped cleanly at bottom) -->
+<div class="relative z-10 w-[310px] sm:w-[330px] rounded-[36px] bg-[#0C0C10] border border-white/15 p-3.5 shadow-2xl shadow-black/80 transform -rotate-2">
+<!-- Real app screenshot (scan results), cropped by the phone frame -->
+            <div class="rounded-[24px] overflow-hidden border border-white/10 bg-[#0E0E12]">
+              <img src="screenshots/scan.png" alt="JunkVPN scan results: 177 of 256 endpoints reachable, best endpoint 53 ms, identity verified" class="block w-full object-cover object-top" style="height:480px">
+            </div>
+            <!-- Bottom Soft Masking Gradient -->
+<div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#08080B] via-[#08080B]/90 to-transparent z-20 pointer-events-none"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. STATS STRIP -->
+<section class="border-y border-white/[0.08] bg-[#0c0c10]/60 backdrop-blur-sm">
+<div class="max-w-7xl mx-auto px-6 md:px-12 py-10">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+<div class="space-y-1">
+<div class="text-headline-xl font-headline-xl text-primary font-bold tracking-tight">53 ms</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">Best endpoint found</div>
+<div class="text-label-code-sm font-label-code-sm text-outline">Real tunnel handshake RTT</div>
+</div>
+<div class="space-y-1">
+<div class="text-headline-xl font-headline-xl text-secondary font-bold tracking-tight">35</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">Confirmed edges</div>
+<div class="text-label-code-sm font-label-code-sm text-outline">Completed in 12.7s sweep</div>
+</div>
+<div class="space-y-1">
+<div class="text-headline-xl font-headline-xl text-tertiary-container font-bold tracking-tight">3</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">Firewall fallback layers</div>
+<div class="text-label-code-sm font-label-code-sm text-outline">API blocking &amp; DNS poisoning</div>
+</div>
+<div class="space-y-1">
+<div class="text-headline-xl font-headline-xl text-white font-bold tracking-tight">0</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">Bytes of telemetry</div>
+<div class="text-label-code-sm font-label-code-sm text-outline">Zero tracking libraries</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. FEATURES SECTION (3x2 Grid) -->
+<section class="py-24 max-w-7xl mx-auto px-6 md:px-12" id="features">
+<!-- Section Header -->
+<div class="text-center max-w-3xl mx-auto mb-16 space-y-3">
+<span class="inline-block px-3 py-1 rounded-full text-label-code-sm font-label-code-sm font-semibold bg-primary/10 text-primary border border-primary/20 tracking-wider">
+        FEATURES
+      </span>
+<h2 class="text-headline-xl font-headline-xl text-white">
+        Everything the big tools do. On your terms.
+      </h2>
+<p class="text-body-md font-body-md text-on-surface-variant">
+        Engineered with a compiled Go core via gomobile. Delivers low-level socket control and full WireGuard handshake capability without requiring root privileges.
+      </p>
+</div>
+<!-- 3x2 Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
+<span class="material-symbols-outlined text-[20px]">network_ping</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">Real handshake scanning</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            True tunnel RTT, jitter, and packet loss measurement. Includes automatic TCP fallback when UDP traffic is filtered. Handshake-confirmed results always rank first.
+          </p>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-primary">
+<span>UDP handshake probes · TCP fallback</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary mb-4">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">One-tap identity verification</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Executes a real WireGuard authentication session to prove the target edge node accepts your cryptographic keypair before you finalize any configuration export.
+          </p>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-secondary">
+<span>ECDH Key exchange</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-tertiary-container/10 border border-tertiary-container/20 flex items-center justify-center text-tertiary-container mb-4">
+<span class="material-symbols-outlined text-[20px]">lock_reset</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">Private by construction</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Cryptographic keys are generated strictly on your physical device and sealed within Android Keystore. Only your public key ever transmits over the wire.
+          </p>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-tertiary-container">
+<span>Android Keystore Provider</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4">
+<span class="material-symbols-outlined text-[20px]">alt_route</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">Registers where WARP is blocked</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed mb-4">
+            Three defensive fallback layers ensure success even when Cloudflare API endpoints are throttled or actively spoofed by restrictive firewalls.
+          </p>
+<div class="flex items-center gap-1.5 text-label-code-sm font-label-code-sm">
+<span class="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary">Auto</span>
+<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-on-surface-variant">Direct</span>
+<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-on-surface-variant">Tunnel</span>
+</div>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-outline">
+<span>Multi-Path Fallback</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
+<span class="material-symbols-outlined text-[20px]">file_download</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">WireGuard &amp; AmneziaWG export</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Generate clean <code>.conf</code> files complete with Jc, Jmin, Jmax, S1, and S2 packet obfuscation parameters explicitly tuned for restrictive DPI environments.
+          </p>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-primary">
+<span>DPI Obfuscation Ready</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="p-6 rounded-xl bg-surface border border-white/[0.08] hover:border-white/[0.18] transition-all hover:-translate-y-1 specular-border flex flex-col justify-between">
+<div>
+<div class="w-10 h-10 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary mb-4">
+<span class="material-symbols-outlined text-[20px]">history_edu</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white mb-2">Local history &amp; expressive UI</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Keeps track of your last 30 scan sweeps stored securely in local SQLite. Designed according to strict Material 3 standards with dynamic theme fidelity.
+          </p>
+</div>
+<div class="mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between text-label-code-sm font-label-code-sm text-secondary">
+<span>Local SQLite Database</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. SPLIT SECTION 1: REGISTRATION ROUTE -->
+<section class="py-24 border-t border-white/[0.08] bg-[#0A0A0E]" id="blocked-networks">
+<div class="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<!-- Left side: Narrative & 3 layers -->
+<div class="lg:col-span-7 space-y-6">
+<span class="text-label-code-sm font-label-code-sm text-primary uppercase tracking-widest font-semibold">Registration Route</span>
+<h2 class="text-headline-xl font-headline-xl text-white">
+          Three ways through a firewall.
+        </h2>
+<p class="text-body-md font-body-md text-on-surface-variant leading-relaxed">
+          State-sponsored firewalls routinely block <code>api.cloudflareclient.com</code> by inspecting SNI or dropping known endpoints. JunkVPN uses an engineered three-layer fallback stack to establish device registration.
+        </p>
+<!-- 3 Architecture Items -->
+<div class="space-y-4 pt-2">
+<div class="p-4 rounded-xl bg-surface border border-white/[0.08] flex items-start gap-4">
+<div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center font-label-code-md text-primary font-bold text-xs shrink-0 mt-0.5">
+              1
+            </div>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Multi-address + DoH failover</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">
+                Direct query to alternate Cloudflare IPv4/IPv6 anycast ranges using encrypted DNS-over-HTTPS queries to bypass local DNS poisoners.
+              </p>
+</div>
+</div>
+<div class="p-4 rounded-xl bg-surface border border-white/[0.08] flex items-start gap-4">
+<div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center font-label-code-md text-secondary font-bold text-xs shrink-0 mt-0.5">
+              2
+            </div>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Optional SOCKS5 / HTTP proxy</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">
+                Optionally route registration through a local SOCKS5 or HTTP proxy — including ports exposed by other VPN apps. The proxy carries only the registration call and is released right after the token exchange.
+              </p>
+</div>
+</div>
+<div class="p-4 rounded-xl bg-surface border border-white/[0.08] flex items-start gap-4">
+<div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center font-label-code-md text-tertiary-container font-bold text-xs shrink-0 mt-0.5">
+              3
+            </div>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">WARP tunnel fallback</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">
+                Endpoint sweep establishes an in-process WireGuard session without touching <code>VpnService</code>, then registers your device directly through that ephemeral tunnel.
+              </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right side: Cropped Settings Mockup (Top ~55%) -->
+<div class="lg:col-span-5 flex flex-col items-center justify-center">
+<div class="relative w-[320px] h-[390px] overflow-hidden rounded-t-[36px] bg-[#0C0C10] border-t border-x border-white/15 p-3.5 shadow-2xl">
+<!-- Real app screenshot (route selector), cropped by the phone frame -->
+            <div class="rounded-[24px] overflow-hidden border border-white/10 bg-[#0E0E12]">
+              <img src="screenshots/settings.png" alt="JunkVPN settings with the registration route selector: Auto, Direct, Tunnel" class="block w-full object-cover object-top" style="height:470px">
+            </div>
+            <!-- Clean Bottom Fade Mask -->
+<div class="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0A0A0E] via-[#0A0A0E]/90 to-transparent pointer-events-none"></div>
+</div>
+<p class="mt-3 text-label-code-sm font-label-code-sm text-outline">Settings → Registration → Route</p>
+</div>
+</div>
+</section>
+<!-- 6. SPLIT SECTION 2: ACCOUNT & EXPORT -->
+<section class="py-24 border-t border-white/[0.08] bg-[#08080B]">
+<div class="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<!-- Right side for desktop layout switched to 1st col: Mockup -->
+<div class="lg:col-span-5 order-2 lg:order-1 flex flex-col items-center justify-center">
+<div class="relative w-[320px] h-[390px] overflow-hidden rounded-t-[36px] bg-[#0C0C10] border-t border-x border-white/15 p-3.5 shadow-2xl">
+<!-- Real app screenshot (registered account), cropped by the phone frame -->
+          <div class="rounded-[24px] overflow-hidden border border-white/10 bg-[#0E0E12]">
+            <img src="screenshots/account.png" alt="JunkVPN account screen with the registered WARP device card and export buttons" class="block w-full object-cover object-top" style="height:470px">
+          </div>
+          <!-- Bottom Soft Mask -->
+<div class="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#08080B] via-[#08080B]/90 to-transparent pointer-events-none"></div>
+</div>
+<p class="mt-3 text-label-code-sm font-label-code-sm text-outline">Account → registered WARP device, one-tap export</p>
+</div>
+<!-- Left Narrative content -->
+<div class="lg:col-span-7 order-1 lg:order-2 space-y-6">
+<span class="text-label-code-sm font-label-code-sm text-secondary uppercase tracking-widest font-semibold">Account &amp; Export</span>
+<h2 class="text-headline-xl font-headline-xl text-white">
+          Register. Verify. Export.
+        </h2>
+<p class="text-body-md font-body-md text-on-surface-variant leading-relaxed">
+          Full workflow implementation: authenticated <code>POST /reg</code> followed by a <code>warp_enabled</code> patch. The device card delivers an instant view of your assigned IP blocks and cryptographic license keys.
+        </p>
+<!-- Checkmark bullet callouts -->
+<div class="space-y-4 pt-2">
+<div class="flex items-start gap-3.5">
+<div class="w-6 h-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Config follows your scan</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+                Target endpoint automatically binds to your newly minted credentials. No manual IP copy-pasting or file editing required.
+              </p>
+</div>
+</div>
+<div class="flex items-start gap-3.5">
+<div class="w-6 h-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Replace or delete anytime</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+                Rotate device identities in one tap. Revoke tokens and unbind safely from Cloudflare servers without leaving stale traces.
+              </p>
+</div>
+</div>
+</div>
+<div class="pt-2">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container border border-white/10 text-label-code-sm font-label-code-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary">key</span>
+<span>Curve25519 keypair · zero cloud sync</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 7. HOW IT WORKS SECTION -->
+<section class="py-24 border-t border-white/[0.08] bg-[#0B0B0F]" id="how-it-works">
+<div class="max-w-7xl mx-auto px-6 md:px-12">
+<div class="text-center max-w-2xl mx-auto mb-16 space-y-3">
+<span class="inline-block px-3 py-1 rounded-full text-label-code-sm font-label-code-sm font-semibold bg-secondary/10 text-secondary border border-secondary/20 tracking-wider">
+          PIPELINE
+        </span>
+<h2 class="text-headline-xl font-headline-xl text-white">How it works</h2>
+<p class="text-body-md font-body-md text-on-surface-variant">From raw network probes to importable profiles in three simple automated steps.</p>
+</div>
+<!-- Step Cards with hairline connection track -->
+<div class="relative grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Track line for desktop -->
+<div class="hidden md:block absolute top-12 left-1/6 right-1/6 h-[1px] bg-gradient-to-r from-primary/30 via-secondary/30 to-tertiary-container/30 -z-0"></div>
+<!-- Step 1 -->
+<div class="relative z-10 p-6 rounded-xl bg-surface border border-white/[0.08] specular-border space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-display-hero font-headline-xl text-primary font-bold opacity-80 leading-none">01</span>
+<span class="px-2 py-1 rounded bg-white/5 border border-white/10 text-label-code-sm font-label-code-sm text-outline">SWEEP</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white">Scan presets</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Choose Quick (64 targets), Standard (256), Deep (1024), or your own custom targets. Measures handshake latency, jitter variance, and packet loss.
+          </p>
+</div>
+<!-- Step 2 -->
+<div class="relative z-10 p-6 rounded-xl bg-surface border border-white/[0.08] specular-border space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-display-hero font-headline-xl text-secondary font-bold opacity-80 leading-none">02</span>
+<span class="px-2 py-1 rounded bg-white/5 border border-white/10 text-label-code-sm font-label-code-sm text-outline">AUTHENTICATE</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white">Register &amp; verify</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Automatic route fallbacks overcome restrictive firewalls to register your public key and complete an authenticated WireGuard handshake confirmation.
+          </p>
+</div>
+<!-- Step 3 -->
+<div class="relative z-10 p-6 rounded-xl bg-surface border border-white/[0.08] specular-border space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-display-hero font-headline-xl text-tertiary-container font-bold opacity-80 leading-none">03</span>
+<span class="px-2 py-1 rounded bg-white/5 border border-white/10 text-label-code-sm font-label-code-sm text-outline">EXPORT</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-white">Export profile</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant leading-relaxed">
+            Generate and copy ready-to-import configuration files targeting your top-ranked endpoint with WireGuard or AmneziaWG obfuscation support.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- 8. PRIVACY & ARCHITECTURE SECTION -->
+<section class="py-24 border-t border-white/[0.08] bg-[#08080B]" id="privacy">
+<div class="max-w-7xl mx-auto px-6 md:px-12">
+<div class="p-8 md:p-12 rounded-2xl bg-surface border border-white/[0.08] specular-border space-y-10">
+<div class="text-center max-w-2xl mx-auto space-y-3">
+<span class="text-label-code-sm font-label-code-sm text-primary uppercase tracking-widest font-semibold">Zero-Trust Local Execution</span>
+<h2 class="text-headline-xl font-headline-xl text-white">Your phone is the whole server.</h2>
+<p class="text-body-md font-body-md text-on-surface-variant">JunkVPN operates under the strictest cryptographic boundaries. There is no middleman backend.</p>
+</div>
+<!-- 2-Column Verified Checklist (6 items) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Zero telemetry compiled</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">No Firebase, Sentry, Mixpanel, or third-party analytics SDKs are compiled into the binary.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">History stays on-device</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">Scanned endpoints and latency logs stay in the local database; your private key never leaves the Android Keystore.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Proxy carries one request</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">When configured, SOCKS5 or HTTP proxies handle only the initial token registration call and are closed immediately.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Tunnel is strictly ephemeral</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">In-process WireGuard session uses temporary credentials and terminates as soon as registration finishes.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">DoH only for API hostname</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">Encrypted DNS lookups are strictly constrained to Cloudflare hostnames; system resolver remains untouched.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 p-4 rounded-xl bg-surface-container-lowest border border-white/[0.06]">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-headline-sm font-headline-sm text-white text-base">Probes Cloudflare anycast only</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">Handshake probes target verified Cloudflare Edge ranges exclusively. Zero external telemetry beacons.</p>
+</div>
+</div>
+</div>
+<!-- Trademark Disclaimer Notice -->
+<div class="p-4 rounded-xl bg-[#0c0c10] border border-white/[0.06] text-center">
+<p class="text-label-code-sm font-label-code-sm text-outline">
+            Disclaimer: Not affiliated with, endorsed by, or connected to Cloudflare, Inc. WARP is a product of Cloudflare, Inc.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- 9. DOWNLOAD CTA HERO CARD -->
+<section class="py-20 max-w-7xl mx-auto px-6 md:px-12" id="download">
+<div class="relative rounded-2xl bg-gradient-to-b from-[#181824] to-[#121218] border border-white/10 p-8 md:p-14 overflow-hidden specular-border text-center">
+<!-- Backlit glow effect -->
+<div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="relative z-10 max-w-2xl mx-auto space-y-6">
+<span class="px-3 py-1 rounded-full text-label-code-sm font-label-code-sm font-semibold bg-white/5 border border-white/10 text-on-surface-variant">
+          GET THE ALPHA
+        </span>
+<h2 class="text-headline-xl md:text-headline-xl font-headline-xl text-white">
+          Grab JunkVPN <span class="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">v0.1.0-alpha</span>
+</h2>
+<p class="text-body-md font-body-md text-on-surface-variant leading-relaxed">
+          Built from source with a Go core and Kotlin UI, signed with the project release key. SHA-256 checksums published alongside every GitHub release tag.
+        </p>
+<!-- CTA Action Buttons -->
+<div class="flex flex-wrap justify-center items-center gap-4 pt-2">
+<a class="flex items-center gap-2 bg-gradient-to-r from-primary-container to-primary hover:opacity-95 text-[#08080B] font-semibold text-body-md font-body-md px-7 py-3.5 rounded-xl transition-transform active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]" href="https://github.com/sithumht/JunkVPN/releases/tag/v0.1.0-alpha"
+<span class="material-symbols-outlined text-[20px]">download</span>
+<span>Download APK · 44.7 MB</span>
+</a>
+<a class="flex items-center gap-2 bg-white/[0.03] hover:bg-white/[0.08] text-white border border-white/10 font-body-md font-body-md px-5 py-3.5 rounded-xl transition-all" href="https://github.com/sithumht/JunkVPN/releases" rel="noopener noreferrer" target="_blank">
+<span>All releases &amp; changelogs</span>
+</a>
+</div>
+<!-- Interactive ADB Copy Chip -->
+<div class="pt-4 flex justify-center">
+<div class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-surface-container-lowest border border-white/10 max-w-md w-full">
+<span class="text-label-code-sm font-label-code-sm text-on-surface truncate">
+<span class="text-primary">$</span> adb install JunkVPN-0.1.0-alpha.apk
+            </span>
+<button class="flex items-center gap-1 text-label-code-sm font-label-code-sm text-outline hover:text-white transition-colors shrink-0" id="copy-btn" onclick="copyAdb()">
+<span class="material-symbols-outlined text-[16px]" id="copy-icon">content_copy</span>
+<span id="copy-text">Copy</span>
+</button>
+</div>
+</div>
+<p class="text-label-code-sm font-label-code-sm text-outline pt-2">
+          Android 8.0+ (API 26) · Sideload via adb or build from source with Android Studio
+        </p>
+</div>
+</div>
+</section>
+<!-- 10. FOOTER -->
+<footer class="border-t border-outline-variant/20 bg-surface-container-lowest">
+<div class="w-full px-6 md:px-12 py-16 max-w-7xl mx-auto space-y-12">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+<!-- Left Brand info -->
+<div class="md:col-span-6 space-y-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">radar</span>
+<span class="text-headline-sm font-headline-sm font-bold text-on-surface">JunkVPN</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant max-w-sm">
+            High-performance Cloudflare WARP scanner and config engine. Signed builds with published checksums.
+          </p>
+<p class="text-label-code-sm font-label-code-sm text-outline">
+            Concept inspired by openwarpkit/warpscout-android — no code was reused.
+          </p>
+</div>
+<!-- Right Links: 2 Columns -->
+<div class="md:col-span-3 space-y-3">
+<h4 class="text-label-code-sm font-label-code-sm text-white uppercase tracking-wider font-semibold">Project</h4>
+<ul class="space-y-2 text-body-sm font-body-sm text-on-surface-variant">
+<li><a class="hover:text-primary transition-colors" href="https://github.com/sithumht/JunkVPN">Source code (GitHub)</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://github.com/sithumht/JunkVPN/releases">Releases &amp; Signatures</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://github.com/sithumht/JunkVPN/issues">Issues &amp; Discussions</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://github.com/sithumht/JunkVPN/blob/main/README.md">README documentation</a></li>
+</ul>
+</div>
+<div class="md:col-span-3 space-y-3">
+<h4 class="text-label-code-sm font-label-code-sm text-white uppercase tracking-wider font-semibold">Resources</h4>
+<ul class="space-y-2 text-body-sm font-body-sm text-on-surface-variant">
+<li><a class="hover:text-primary transition-colors" href="#privacy">Privacy notes</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://github.com/sithumht/JunkVPN/blob/main/README.md#building">Building guide</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://www.wireguard.com/">What is WireGuard?</a></li>
+<li><a class="hover:text-primary transition-colors" href="https://developers.cloudflare.com/cloudflare-one/connections/connect-devices/warp/">About Cloudflare WARP</a></li>
+</ul>
+</div>
+</div>
+<!-- Bottom Hairline Separator Bar -->
+<div class="pt-8 border-t border-white/[0.06] flex flex-col md:flex-row justify-between items-center gap-4 text-label-code-sm font-label-code-sm text-outline">
+<div>
+          MIT License · © 2026 JunkVPN contributors
+        </div>
+<div>
+          Not affiliated with Cloudflare, Inc.
+        </div>
+</div>
+</div>
+</footer>
+<!-- Micro-interaction Script -->
+<script>
+    function copyAdb() {
+      const command = "adb install JunkVPN-0.1.0-alpha.apk";
+      navigator.clipboard.writeText(command).then(() => {
+        const text = document.getElementById("copy-text");
+        const icon = document.getElementById("copy-icon");
+        text.innerText = "Copied!";
+        icon.innerText = "check";
+        text.classList.add("text-primary");
+        icon.classList.add("text-primary");
+        setTimeout(() => {
+          text.innerText = "Copy";
+          icon.innerText = "content_copy";
+          text.classList.remove("text-primary");
+          icon.classList.remove("text-primary");
+        }, 2000);
+      });
+    }
+  </script>
+</body></html>
