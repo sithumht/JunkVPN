@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -29,6 +30,10 @@ type RegisterOptions struct {
 	Locale    string `json:"locale,omitempty"`
 	OSVersion string `json:"osVersion,omitempty"`
 	Serial    string `json:"serial,omitempty"`
+	// Proxy routes the registration request through a SOCKS5 or HTTP
+	// proxy (e.g. "socks5://127.0.0.1:1080") on networks that block the
+	// WARP API. Empty means direct.
+	Proxy string `json:"proxy,omitempty"`
 }
 
 // Account is the subset of registration data JunkVPN persists.
@@ -161,8 +166,8 @@ func register(ctx context.Context, opts RegisterOptions) (*Account, error) {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/%s/reg", base, apiVer)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	regURL := fmt.Sprintf("%s/%s/reg", base, apiVer)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, regURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +175,27 @@ func register(ctx context.Context, opts RegisterOptions) (*Account, error) {
 	req.Header.Set("CF-Client-Version", defaultClientVer)
 	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	// Registration must survive censored networks: optionally route
+	// through a user proxy, and let the dialer try every system and
+	// DNS-over-HTTPS answer for the API host instead of only the first
+	// resolved address (a single refused or poisoned IP must not block
+	// the request).
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if opts.Proxy != "" {
+		proxyURL, err := url.Parse(opts.Proxy)
+		if err != nil || proxyURL.Host == "" {
+			return nil, fmt.Errorf("bad proxy %q — use socks5://host:port or http://host:port", opts.Proxy)
+		}
+		switch proxyURL.Scheme {
+		case "http", "https", "socks5", "socks5h":
+		default:
+			return nil, fmt.Errorf("unsupported proxy scheme %q — use socks5:// or http://", proxyURL.Scheme)
+		}
+		tr.Proxy = http.ProxyURL(proxyURL)
+	}
+	tr.DialContext = (&failoverDialer{}).DialContext
+
+	client := &http.Client{Timeout: 20 * time.Second, Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("registration request: %w", err)

@@ -80,8 +80,12 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
         busy = true
         error = null
         scope.launch {
+            val proxy = container.settings.registrationProxy.value
             val outcome = runCatching {
-                val json = WarpBridge.registerAccount("{}")
+                val opts = JSONObject().apply {
+                    if (proxy.isNotBlank()) put("proxy", proxy)
+                }
+                val json = WarpBridge.registerAccount(opts.toString())
                 container.account.save(json)
             }
             busy = false
@@ -89,7 +93,7 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
                 .onSuccess {
                     toast(if (replacing) "New account created" else "WARP account created")
                 }
-                .onFailure { error = it.message ?: it.toString() }
+                .onFailure { error = withNetworkHint(it.message ?: it.toString(), proxy) }
         }
     }
 
@@ -398,4 +402,33 @@ private fun ErrorCard(message: String) {
             color = MaterialTheme.colorScheme.onErrorContainer,
         )
     }
+}
+
+/**
+ * Adds actionable guidance to a registration failure. A refused configured
+ * proxy points at the proxy setting; refused/timeout errors otherwise look
+ * like a network blocking the WARP API (the common carrier/DPI case), so
+ * users know the account itself is not the problem.
+ */
+private fun withNetworkHint(message: String, proxy: String): String {
+    val proxyHost = proxy.substringAfter("://", "").substringBeforeLast(":").trim('/')
+    if (proxy.isNotBlank() && proxyHost.isNotEmpty() && message.contains(proxyHost)) {
+        return message + "\n\nThe proxy at $proxyHost refused the " +
+            "connection — check Settings → Registration, or start the " +
+            "VPN/proxy app that provides it."
+    }
+    val looksBlocked = listOf(
+        "connection refused",
+        "timed out",
+        "timeout",
+        "no such host",
+        "network is unreachable",
+        "host is unreachable",
+        "all addresses failed",
+    ).any { message.contains(it, ignoreCase = true) }
+    if (!looksBlocked) return message
+    return message + "\n\nThis network appears to block the WARP " +
+        "registration API. Set a proxy in Settings → Registration, or " +
+        "register once on another network (Wi-Fi or hotspot) — the " +
+        "account keeps working here afterwards."
 }

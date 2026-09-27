@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,9 +49,15 @@ private val ThemeMode.label: String
 fun SettingsScreen(container: Container, toast: (String) -> Unit) {
     val themeMode by container.settings.themeMode.collectAsState()
     val defaultPreset by container.settings.defaultPreset.collectAsState()
+    val registrationProxy by container.settings.registrationProxy.collectAsState()
     val historyEntries by container.history.entries.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
     var coreVersion by remember { mutableStateOf("…") }
+
+    val proxyLooksValid = registrationProxy.isBlank() ||
+        registrationProxy.startsWith("socks5://") ||
+        registrationProxy.startsWith("http://") ||
+        registrationProxy.startsWith("https://")
 
     LaunchedEffect(Unit) {
         coreVersion = runCatching { WarpBridge.version() }.getOrDefault("?")
@@ -111,6 +118,37 @@ fun SettingsScreen(container: Container, toast: (String) -> Unit) {
                         text = "Used when the Scan screen opens. A scan sends UDP " +
                             "WireGuard probes to Cloudflare WARP ranges, with a TCP " +
                             "connect fallback when UDP is filtered.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item(key = "registration") {
+                SectionCard(title = "Registration") {
+                    OutlinedTextField(
+                        value = registrationProxy,
+                        onValueChange = { container.settings.setRegistrationProxy(it.trim()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Proxy") },
+                        placeholder = { Text("socks5://127.0.0.1:1080") },
+                        singleLine = true,
+                        isError = !proxyLooksValid,
+                        supportingText = {
+                            Text(
+                                text = if (proxyLooksValid) {
+                                    "Optional — routes only the WARP register request. Empty = direct."
+                                } else {
+                                    "Use socks5://host:port or http://host:port"
+                                },
+                            )
+                        },
+                    )
+                    Text(
+                        text = "For networks that block api.cloudflareclient.com. " +
+                            "Local ports exposed by other VPN apps work too. " +
+                            "Scanning and the tunnel are unaffected — they always " +
+                            "connect directly.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

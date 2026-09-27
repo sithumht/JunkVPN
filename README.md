@@ -29,6 +29,14 @@ All code in this repository is original.
 - **WARP account** — registers a device through the public WARP API. The
   private key is generated on-device and stored **encrypted with the Android
   Keystore**; only the public key is sent to Cloudflare.
+- **Registration on blocked networks** — networks that firewall the WARP API
+  don't stop you: the register request can be routed through a SOCKS5/HTTP
+  proxy (Settings → Registration, including local ports exposed by other VPN
+  apps), and instead of trusting a single resolved IP it retries every
+  system **and DNS-over-HTTPS** answer for the API host (IPv4 and IPv6).
+  Failures show exactly which addresses were tried plus how to work around
+  the block — register once on another network and the account keeps
+  working on the blocked one.
 - **Config export** — one tap to copy/share a standard WireGuard `.conf`, or
   an AmneziaWG variant with obfuscation parameters (Jc/Jmin/Jmax/S1/S2).
 - **History** — the last 30 scans are saved locally with their top results.
@@ -121,6 +129,11 @@ The suite includes a full end-to-end handshake test against a real
 - No analytics, no telemetry, no accounts on our side.
 - Scan history, settings, and the encrypted WARP identity never leave the
   device (registration talks only to `api.cloudflareclient.com`).
+- The optional registration proxy carries only the register request;
+  scanning and the tunnel never use it.
+- If system DNS fails during registration, the API host is re-resolved via
+  DNS-over-HTTPS (1.1.1.1 / 8.8.8.8) as a second opinion — that lookup
+  sends only the API hostname, never anything else.
 - Scanning sends UDP/TCP probes to Cloudflare anycast addresses only.
 
 ## Disclaimer
