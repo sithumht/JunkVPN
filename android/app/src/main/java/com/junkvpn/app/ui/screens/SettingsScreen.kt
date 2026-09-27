@@ -50,6 +50,7 @@ fun SettingsScreen(container: Container, toast: (String) -> Unit) {
     val themeMode by container.settings.themeMode.collectAsState()
     val defaultPreset by container.settings.defaultPreset.collectAsState()
     val registrationProxy by container.settings.registrationProxy.collectAsState()
+    val registrationRoute by container.settings.registrationRoute.collectAsState()
     val historyEntries by container.history.entries.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
     var coreVersion by remember { mutableStateOf("…") }
@@ -126,6 +127,39 @@ fun SettingsScreen(container: Container, toast: (String) -> Unit) {
 
             item(key = "registration") {
                 SectionCard(title = "Registration") {
+                    Text(
+                        text = "Route",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        listOf(
+                            "auto" to "Auto",
+                            "direct" to "Direct",
+                            "tunnel" to "Tunnel",
+                        ).forEachIndexed { index, (id, label) ->
+                            SegmentedButton(
+                                selected = registrationRoute == id,
+                                onClick = { container.settings.setRegistrationRoute(id) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = 3,
+                                ),
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Auto tries the WARP API directly and, when the " +
+                            "network blocks it, falls back to registering through a " +
+                            "WARP tunnel. Tunnel forces that tunnel route (useful on " +
+                            "always-blocked networks); Direct never tunnels.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     OutlinedTextField(
                         value = registrationProxy,
                         onValueChange = { container.settings.setRegistrationProxy(it.trim()) },
@@ -137,7 +171,8 @@ fun SettingsScreen(container: Container, toast: (String) -> Unit) {
                         supportingText = {
                             Text(
                                 text = if (proxyLooksValid) {
-                                    "Optional — routes only the WARP register request. Empty = direct."
+                                    "Optional — routes only the WARP register request " +
+                                        "instead of the tunnel. Empty = direct or tunnel."
                                 } else {
                                     "Use socks5://host:port or http://host:port"
                                 },
@@ -146,9 +181,9 @@ fun SettingsScreen(container: Container, toast: (String) -> Unit) {
                     )
                     Text(
                         text = "For networks that block api.cloudflareclient.com. " +
-                            "Local ports exposed by other VPN apps work too. " +
-                            "Scanning and the tunnel are unaffected — they always " +
-                            "connect directly.",
+                            "Local ports exposed by other VPN apps work too. A set " +
+                            "proxy replaces the tunnel fallback. Scanning never uses " +
+                            "it — probes always connect directly.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

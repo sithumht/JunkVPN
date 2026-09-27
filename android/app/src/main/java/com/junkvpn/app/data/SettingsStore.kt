@@ -9,8 +9,9 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
  * Small preferences: theme, default scan preset, the last known best
- * endpoint (used as the default target when exporting configs) and the
- * optional proxy used for WARP registration on blocked networks.
+ * endpoint (used as the default target when exporting configs), the
+ * optional proxy used for WARP registration on blocked networks and the
+ * registration route (direct vs. the WARP tunnel fallback).
  */
 class SettingsStore(context: Context) {
 
@@ -31,6 +32,9 @@ class SettingsStore(context: Context) {
     private val _registrationProxy = MutableStateFlow(prefs.getString(KEY_PROXY, "") ?: "")
     val registrationProxy: StateFlow<String> = _registrationProxy.asStateFlow()
 
+    private val _registrationRoute = MutableStateFlow(prefs.getString(KEY_ROUTE, "auto") ?: "auto")
+    val registrationRoute: StateFlow<String> = _registrationRoute.asStateFlow()
+
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME, mode.name).apply()
         _themeMode.value = mode
@@ -46,6 +50,11 @@ class SettingsStore(context: Context) {
         _registrationProxy.value = proxy
     }
 
+    fun setRegistrationRoute(route: String) {
+        prefs.edit().putString(KEY_ROUTE, route).apply()
+        _registrationRoute.value = route
+    }
+
     fun saveBestEndpoint(endpoint: String) {
         if (endpoint.isBlank()) return
         prefs.edit().putString(KEY_BEST, endpoint).apply()
@@ -57,5 +66,6 @@ class SettingsStore(context: Context) {
         const val KEY_PRESET = "default_preset"
         const val KEY_BEST = "best_endpoint"
         const val KEY_PROXY = "registration_proxy"
+        const val KEY_ROUTE = "registration_route"
     }
 }

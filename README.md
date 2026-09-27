@@ -29,14 +29,25 @@ All code in this repository is original.
 - **WARP account** — registers a device through the public WARP API. The
   private key is generated on-device and stored **encrypted with the Android
   Keystore**; only the public key is sent to Cloudflare.
-- **Registration on blocked networks** — networks that firewall the WARP API
-  don't stop you: the register request can be routed through a SOCKS5/HTTP
-  proxy (Settings → Registration, including local ports exposed by other VPN
-  apps), and instead of trusting a single resolved IP it retries every
-  system **and DNS-over-HTTPS** answer for the API host (IPv4 and IPv6).
-  Failures show exactly which addresses were tried plus how to work around
+- **Registration on blocked networks** — three layers keep registration
+  working where the WARP API is firewalled:
+  1. **multi-address failover** — instead of trusting a single resolved IP
+     it retries every system **and DNS-over-HTTPS** answer for the API host
+     (IPv4 and IPv6);
+  2. **optional proxy** — the register request can go through a SOCKS5/HTTP
+     proxy (Settings → Registration, including local ports exposed by other
+     VPN apps);
+  3. **WARP tunnel fallback** — when the direct route never answers at the
+     transport level, the app sweeps WARP endpoint candidates for a live
+     handshake, brings up an *in-process* WireGuard tunnel (userspace
+     network stack inside the app — no root, no VpnService) and registers
+     through it.
+
+  The route is selectable in Settings → Registration (**Auto / Direct /
+  Tunnel**). Failures show exactly what was tried plus how to work around
   the block — register once on another network and the account keeps
-  working on the blocked one.
+  working on the blocked one. The fallback tunnel speaks plain WireGuard;
+  carrying AmneziaWG parameters inside the tunnel is on the backlog.
 - **Config export** — one tap to copy/share a standard WireGuard `.conf`, or
   an AmneziaWG variant with obfuscation parameters (Jc/Jmin/Jmax/S1/S2).
 - **History** — the last 30 scans are saved locally with their top results.
@@ -70,9 +81,12 @@ JunkVPN/
 │   ├── wireguard.go     Noise-ish handshake built on BLAKE2s + Curve25519
 │   ├── probe.go         UDP handshake + TCP connect probes, jitter/loss stats
 │   ├── verify.go        account identity verification (authenticated handshake)
-│   ├── warpapi.go       WARP device registration client
+│   ├── warpapi.go       WARP registration client (POST /reg + warp_enabled PATCH)
+│   ├── failover.go      multi-address + DoH dialer for censored networks
+│   ├── tunnel.go        WARP tunnel fallback: endpoint sweep + userspace netstack
 │   ├── wgconfig.go      WireGuard / AmneziaWG config rendering
-│   └── *_test.go        unit tests + end-to-end handshake vs. wireguard-go
+│   └── *_test.go        unit tests + e2e: handshakes and tunnel registration
+│                        vs. wireguard-go responders, guarded live API tests
 ├── android/             Jetpack Compose app (package com.junkvpn.app)
 │   └── app/src/main/java/com/junkvpn/app/
 │       ├── core/        WarpBridge (gomobile bindings) + result models
@@ -123,6 +137,11 @@ go test ./...
 
 The suite includes a full end-to-end handshake test against a real
 `wireguard-go` responder, so the wire format is verified without a device.
+It also boots an **all-userspace WireGuard link** (both peers on in-memory
+netstacks) and pushes a complete registration — POST `/reg` and the
+`warp_enabled` PATCH — through the tunnel fallback to a mock API. Live
+tests against the public API (registration, endpoint identity matrix) are
+guarded behind `JUNKVPN_LIVE=1` so `go test ./...` stays offline.
 
 ## Privacy
 
@@ -130,7 +149,11 @@ The suite includes a full end-to-end handshake test against a real
 - Scan history, settings, and the encrypted WARP identity never leave the
   device (registration talks only to `api.cloudflareclient.com`).
 - The optional registration proxy carries only the register request;
-  scanning and the tunnel never use it.
+  scanning never uses it.
+- The WARP tunnel fallback exists only during registration: it handshakes
+  with a widely shared placeholder WireGuard identity (real edges ignore
+  unregistered keys) and carries only the new account's public key inside
+  the tunnel — no account secrets exist before it does.
 - If system DNS fails during registration, the API host is re-resolved via
   DNS-over-HTTPS (1.1.1.1 / 8.8.8.8) as a second opinion — that lookup
   sends only the API hostname, never anything else.

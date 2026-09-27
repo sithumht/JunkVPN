@@ -2,6 +2,7 @@ package com.junkvpn.app.core
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import warpcore.RegisterEvents
 import warpcore.Scan
 import warpcore.ScanEvents
 import warpcore.Warpcore
@@ -19,8 +20,13 @@ object WarpBridge {
 
     suspend fun presetConfig(name: String): String = call { Warpcore.presetConfig(name) }
 
-    suspend fun registerAccount(optsJson: String = "{}"): String =
-        call { Warpcore.registerAccount(optsJson) }
+    /**
+     * Registers a fresh WARP account. [events] receives progress steps while
+     * the route chain runs (direct → proxy → WARP tunnel fallback); it is
+     * called from native worker threads.
+     */
+    suspend fun registerAccount(optsJson: String = "{}", events: RegisterEvents): String =
+        call { Warpcore.registerAccount(optsJson, events) }
 
     suspend fun buildConfig(kind: String, accountJson: String, optsJson: String = ""): String =
         call { Warpcore.buildConfig(kind, accountJson, optsJson) }

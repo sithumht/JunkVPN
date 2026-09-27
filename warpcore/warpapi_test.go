@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,12 +17,16 @@ func TestRegisterAccountAgainstMockAPI(t *testing.T) {
 	var payload registrationPayload
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotUA = r.Header.Get("User-Agent")
-		gotClientVer = r.Header.Get("CF-Client-Version")
-		body, _ := io.ReadAll(r.Body)
-		if err := json.Unmarshal(body, &payload); err != nil {
-			t.Errorf("payload: %v", err)
+		if r.Method == http.MethodPost {
+			// Record the POST; the follow-up warp_enabled PATCH hits
+			// the same server with a different path and body.
+			gotPath = r.URL.Path
+			gotUA = r.Header.Get("User-Agent")
+			gotClientVer = r.Header.Get("CF-Client-Version")
+			body, _ := io.ReadAll(r.Body)
+			if err := json.Unmarshal(body, &payload); err != nil {
+				t.Errorf("payload: %v", err)
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -47,7 +52,7 @@ func TestRegisterAccountAgainstMockAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opts: %v", err)
 	}
-	out, err := RegisterAccount(string(optsJSON))
+	out, err := RegisterAccount(string(optsJSON), nil)
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -105,7 +110,7 @@ func TestRegisterAccountHTTPError(t *testing.T) {
 	defer srv.Close()
 
 	optsJSON, _ := json.Marshal(RegisterOptions{BaseURL: srv.URL})
-	if _, err := RegisterAccount(string(optsJSON)); err == nil {
+	if _, err := RegisterAccount(string(optsJSON), nil); err == nil {
 		t.Fatal("HTTP error not surfaced")
 	}
 }
@@ -188,7 +193,7 @@ func TestRegisterAccountThroughProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opts: %v", err)
 	}
-	out, err := RegisterAccount(string(optsJSON))
+	out, err := RegisterAccount(string(optsJSON), nil)
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -212,7 +217,7 @@ func TestRegisterAccountRejectsBadProxy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("opts: %v", err)
 		}
-		_, err = RegisterAccount(string(optsJSON))
+		_, err = RegisterAccount(string(optsJSON), nil)
 		if err == nil {
 			t.Errorf("proxy %q: error not surfaced", bad)
 			continue
@@ -228,7 +233,7 @@ func TestRegisterAccountRejectsBadProxy(t *testing.T) {
 // error naming the proxy address.
 func TestRegisterAccountRefusedProxyFailsFast(t *testing.T) {
 	start := time.Now()
-	_, err := RegisterAccount(`{"proxy":"socks5://127.0.0.1:9"}`)
+	_, err := RegisterAccount(`{"proxy":"socks5://127.0.0.1:9"}`, nil)
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("expected error")
@@ -238,5 +243,196 @@ func TestRegisterAccountRefusedProxyFailsFast(t *testing.T) {
 	}
 	if elapsed > 10*time.Second {
 		t.Errorf("took %v, want fast failure", elapsed)
+	}
+}
+
+// --- registration route chain + warp_enabled PATCH ---
+
+// stepRecorder captures RegisterEvents progress for assertions.
+type stepRecorder struct {
+	mu    sync.Mutex
+	steps []string
+}
+
+func (r *stepRecorder) OnStep(step string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.steps = append(r.steps, step)
+}
+
+func (r *stepRecorder) all() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return strings.Join(r.steps, "\n")
+}
+
+// Registration must finish with PATCH /reg/{id} {"warp_enabled": true},
+// authorized by the token the POST just issued � without it the account
+// handshakes but never passes traffic.
+func TestRegisterAccountEnablesWARP(t *testing.T) {
+	var patchPath, patchAuth string
+	var patchBody map[string]bool
+	var patches int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			patches++
+			patchPath = r.URL.Path
+			patchAuth = r.Header.Get("Authorization")
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &patchBody)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(cannedRegResponse))
+	}))
+	defer srv.Close()
+
+	optsJSON, _ := json.Marshal(RegisterOptions{BaseURL: srv.URL})
+	out, err := RegisterAccount(string(optsJSON), nil)
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if patches != 1 {
+		t.Fatalf("PATCH count = %d, want 1", patches)
+	}
+	if want := "/v0a4471/reg/device-proxy"; patchPath != want {
+		t.Errorf("patch path = %q, want %q", patchPath, want)
+	}
+	if want := "Bearer tok-proxy"; patchAuth != want {
+		t.Errorf("patch auth = %q, want %q", patchAuth, want)
+	}
+	if !patchBody["warp_enabled"] {
+		t.Errorf("patch body = %v, want warp_enabled=true", patchBody)
+	}
+	var acc Account
+	if err := json.Unmarshal([]byte(out), &acc); err != nil || acc.DeviceID == "" {
+		t.Errorf("account = %q (%v)", out, err)
+	}
+}
+
+// A failed warp_enabled PATCH fails the whole registration instead of
+// returning a half-enabled account.
+func TestRegisterAccountPatchFailureSurfaces(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			http.Error(w, `{"message":"nope"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(cannedRegResponse))
+	}))
+	defer srv.Close()
+
+	optsJSON, _ := json.Marshal(RegisterOptions{BaseURL: srv.URL})
+	_, err := RegisterAccount(string(optsJSON), nil)
+	if err == nil {
+		t.Fatal("PATCH failure not surfaced")
+	}
+	if !strings.Contains(err.Error(), "enable WARP") || !strings.Contains(err.Error(), "HTTP 500") {
+		t.Errorf("error = %v, want enable WARP HTTP 500", err)
+	}
+}
+
+// route=tunnel must never touch the direct endpoint.
+func TestRegisterRouteTunnelSkipsDirect(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	steps := &stepRecorder{}
+	optsJSON, _ := json.Marshal(RegisterOptions{
+		BaseURL: srv.URL,
+		Route:   "tunnel",
+		Targets: []string{"127.0.0.1:1"},
+	})
+	_, err := RegisterAccount(string(optsJSON), steps)
+	if err == nil {
+		t.Fatal("expected the tunnel sweep to fail against a dead target")
+	}
+	if n := atomic.LoadInt32(&hits); n != 0 {
+		t.Errorf("direct endpoint hit %d times, want 0", n)
+	}
+	if !strings.Contains(err.Error(), "handshake") {
+		t.Errorf("error = %v, want handshake failure", err)
+	}
+	if !strings.Contains(steps.all(), "Sweeping") {
+		t.Errorf("steps = %q, want sweep progress", steps.all())
+	}
+}
+
+// In the auto route, a real HTTP answer from the API (even an error)
+// proves the endpoint is reachable � the tunnel must not run.
+func TestRegisterAutoStopsAtAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"nope"}`, http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	steps := &stepRecorder{}
+	optsJSON, _ := json.Marshal(RegisterOptions{
+		BaseURL: srv.URL,
+		Route:   "auto",
+		Targets: []string{"127.0.0.1:1"},
+	})
+	_, err := RegisterAccount(string(optsJSON), steps)
+	if err == nil {
+		t.Fatal("expected the HTTP error to surface")
+	}
+	if !strings.Contains(err.Error(), "HTTP 500") {
+		t.Errorf("error = %v, want HTTP 500", err)
+	}
+	if strings.Contains(steps.all(), "Direct route blocked") {
+		t.Errorf("tunnel fallback ran despite a reachable API: %q", steps.all())
+	}
+}
+
+// When the direct route fails at the transport level and the tunnel also
+// fails, the error reports both phases.
+func TestRegisterAutoReportsBothRouteFailures(t *testing.T) {
+	// Bound the direct attempt: 10.7.0.1 is a test-only address that is
+	// never routed on the host, but some networks black-hole it instead
+	// of refusing fast.
+	old := directRegisterTimeout
+	directRegisterTimeout = 2 * time.Second
+	defer func() { directRegisterTimeout = old }()
+
+	optsJSON, _ := json.Marshal(RegisterOptions{
+		BaseURL: "http://10.7.0.1:9",
+		Route:   "auto",
+		Targets: []string{"127.0.0.1:1"},
+	})
+	steps := &stepRecorder{}
+	_, err := RegisterAccount(string(optsJSON), steps)
+	if err == nil {
+		t.Fatal("expected both routes to fail")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "registration request") {
+		t.Errorf("error = %v, want the direct failure included", msg)
+	}
+	if !strings.Contains(msg, "via WARP tunnel") {
+		t.Errorf("error = %v, want the tunnel failure included", msg)
+	}
+	if !strings.Contains(steps.all(), "Direct route blocked") {
+		t.Errorf("steps = %q, want the fallback step", steps.all())
+	}
+}
+
+// An unknown route is a configuration mistake, reported before any
+// network attempt.
+func TestRegisterUnknownRouteRejected(t *testing.T) {
+	start := time.Now()
+	_, err := RegisterAccount(`{"route":"carrier-pigeon"}`, nil)
+	if err == nil || !strings.Contains(err.Error(), "route") {
+		t.Fatalf("err = %v, want route error", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("took %v, want immediate rejection", elapsed)
 	}
 }

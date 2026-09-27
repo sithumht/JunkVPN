@@ -54,6 +54,7 @@ import com.junkvpn.app.ui.copyToClipboard
 import com.junkvpn.app.ui.shareText
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import warpcore.RegisterEvents
 
 private data class ConfigPreview(val title: String, val body: String)
 
@@ -68,6 +69,7 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
 
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var regStep by remember { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<ConfigPreview?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmReplace by remember { mutableStateOf(false) }
@@ -79,21 +81,37 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
     fun register(replacing: Boolean) {
         busy = true
         error = null
+        regStep = null
         scope.launch {
             val proxy = container.settings.registrationProxy.value
+            val route = container.settings.registrationRoute.value
+            // Progress steps arrive on a native worker thread; hop back to
+            // the main dispatcher before touching Compose state.
+            val events = object : RegisterEvents {
+                override fun onStep(step: String) {
+                    scope.launch { regStep = step }
+                }
+            }
             val outcome = runCatching {
                 val opts = JSONObject().apply {
                     if (proxy.isNotBlank()) put("proxy", proxy)
+                    put("route", route)
                 }
-                val json = WarpBridge.registerAccount(opts.toString())
+                val json = WarpBridge.registerAccount(opts.toString(), events)
                 container.account.save(json)
             }
             busy = false
+            val lastStep = regStep
+            regStep = null
             outcome
                 .onSuccess {
                     toast(if (replacing) "New account created" else "WARP account created")
                 }
-                .onFailure { error = withNetworkHint(it.message ?: it.toString(), proxy) }
+                .onFailure { err ->
+                    val detail = (err.message ?: err.toString()) +
+                        if (lastStep != null) "\n\nLast step: $lastStep" else ""
+                    error = withNetworkHint(detail, proxy)
+                }
         }
     }
 
@@ -178,6 +196,13 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
                                 } else {
                                     Text("Create account")
                                 }
+                            }
+                            if (busy && regStep != null) {
+                                Text(
+                                    text = regStep!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                )
                             }
                         }
                     }
@@ -267,6 +292,16 @@ fun AccountScreen(container: Container, toast: (String) -> Unit) {
 
                 error?.let { message ->
                     item(key = "error") { ErrorCard(message) }
+                }
+
+                if (busy && regStep != null) {
+                    item(key = "progress") {
+                        Text(
+                            text = regStep!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 item(key = "manage") {
@@ -408,7 +443,9 @@ private fun ErrorCard(message: String) {
  * Adds actionable guidance to a registration failure. A refused configured
  * proxy points at the proxy setting; refused/timeout errors otherwise look
  * like a network blocking the WARP API (the common carrier/DPI case), so
- * users know the account itself is not the problem.
+ * users know the account itself is not the problem. When the tunnel
+ * fallback already ran and failed, the advice reflects that instead of
+ * suggesting it.
  */
 private fun withNetworkHint(message: String, proxy: String): String {
     val proxyHost = proxy.substringAfter("://", "").substringBeforeLast(":").trim('/')
@@ -425,10 +462,23 @@ private fun withNetworkHint(message: String, proxy: String): String {
         "network is unreachable",
         "host is unreachable",
         "all addresses failed",
+        "completed a handshake",
     ).any { message.contains(it, ignoreCase = true) }
     if (!looksBlocked) return message
-    return message + "\n\nThis network appears to block the WARP " +
-        "registration API. Set a proxy in Settings → Registration, or " +
-        "register once on another network (Wi-Fi or hotspot) — the " +
-        "account keeps working here afterwards."
+    val tunnelTried = message.contains("via WARP tunnel") ||
+        message.contains("completed a handshake", ignoreCase = true)
+    return if (tunnelTried) {
+        message + "\n\nThis network appears to block the WARP " +
+            "registration API, and the built-in WARP tunnel fallback " +
+            "failed here too. Try a proxy in Settings → Registration, " +
+            "or register once on another network (Wi-Fi or hotspot) — " +
+            "the account keeps working here afterwards."
+    } else {
+        message + "\n\nThis network appears to block the WARP " +
+            "registration API. Set the Registration route to Auto or " +
+            "Tunnel in Settings so the WARP tunnel fallback can run, " +
+            "set a proxy there, or register once on another network " +
+            "(Wi-Fi or hotspot) — the account keeps working here " +
+            "afterwards."
+    }
 }
