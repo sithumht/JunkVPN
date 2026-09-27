@@ -1,5 +1,10 @@
 # JunkVPN
 
+[![Alpha release](https://img.shields.io/github/v/release/sithumht/JunkVPN?include_prereleases&label=alpha&color=34e5a1)](https://github.com/sithumht/JunkVPN/releases/tag/v0.1.0-alpha)
+[![License: MIT](https://img.shields.io/badge/license-MIT-34e5a1.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-8b7cff.svg)](https://github.com/sithumht/JunkVPN/releases)
+[![Website](https://img.shields.io/badge/website-sithumht.github.io%2FJunkVPN-131318.svg?labelColor=08080b&color=9b9baa)](https://sithumht.github.io/JunkVPN/)
+
 An Android app that finds the fastest working **Cloudflare WARP** endpoints for
 your network, registers a WARP device account, and exports ready-to-import
 **WireGuard** / **AmneziaWG** tunnel configs.
@@ -15,6 +20,14 @@ All code in this repository is original.
 > [openwarpkit/warpscout-android](https://github.com/openwarpkit/warpscout-android).
 > No code was reused — the scanner, protocol handling, and UI are written from
 > scratch here.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/scan.png" alt="JunkVPN scan results screen: endpoint scanner presets, 177 of 256 Cloudflare WARP endpoints reachable, best endpoint 53 ms, identity verified" width="260">
+  <img src="docs/screenshots/settings.png" alt="JunkVPN settings screen with the registration route selector: Auto, Direct and Tunnel fallback modes for blocked networks" width="260">
+  <img src="docs/screenshots/account.png" alt="JunkVPN account screen showing a registered WARP device card with device ID, IPv4 and IPv6 addresses, license, and WireGuard / AmneziaWG export buttons" width="260">
+</p>
 
 ## Features
 
