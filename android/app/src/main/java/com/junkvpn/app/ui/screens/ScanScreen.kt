@@ -2,6 +2,8 @@ package com.junkvpn.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,6 +58,7 @@ private val presetOptions = listOf(
     PresetOption("quick", "Quick", "64 targets · 1 probe · 1.0s"),
     PresetOption("standard", "Standard", "256 targets · 2 probes · 1.5s"),
     PresetOption("deep", "Deep", "1024 targets · 3 probes · 2.0s"),
+    PresetOption("custom", "Custom", "your targets · 2 probes · 1.5s"),
 )
 
 /** Splits the free-form target field into individual host/IP entries. */
@@ -64,7 +67,7 @@ private fun parseTargets(raw: String): List<String> =
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ScanScreen(container: Container, toast: (String) -> Unit) {
     val state by container.scan.state.collectAsState()
@@ -79,6 +82,18 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
     val display: List<EndpointUi> = if (running) state.live
     else state.results.filter { it.ok }
     val unreachable = if (finished) state.results.count { !it.ok } else 0
+
+    /** Starts a scan honouring the Custom preset's target rules. */
+    val startScan: () -> Unit = {
+        if (!running) {
+            val targets = if (preset == "custom") parseTargets(customTargets) else emptyList()
+            if (preset == "custom" && targets.isEmpty()) {
+                toast("Add at least one target, e.g. 162.159.192.1:2408")
+            } else {
+                container.scan.start(preset, targets)
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
@@ -113,7 +128,7 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         presetOptions.forEach { option ->
                             FilterChip(
                                 selected = preset == option.id,
@@ -123,7 +138,14 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                         }
                     }
                     Text(
-                        text = presetOptions.firstOrNull { it.id == preset }?.detail.orEmpty(),
+                        text = when (preset) {
+                            "custom" -> {
+                                val n = parseTargets(customTargets).size
+                                if (n == 0) "your targets · required"
+                                else "$n target${if (n == 1) "" else "s"} · 2 probes · 1.5s"
+                            }
+                            else -> presetOptions.firstOrNull { it.id == preset }?.detail.orEmpty()
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -131,15 +153,34 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
             }
 
             item(key = "targets") {
+                val targets = parseTargets(customTargets)
+                val customMissing = preset == "custom" && targets.isEmpty()
                 OutlinedTextField(
                     value = customTargets,
-                    onValueChange = { customTargets = it },
+                    onValueChange = { raw ->
+                        customTargets = raw
+                        // Typing targets selects the Custom preset for you.
+                        if (raw.isNotBlank() && preset != "custom") preset = "custom"
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
-                    label = { Text("Custom targets (optional)") },
+                    label = { Text("Custom targets") },
                     placeholder = { Text("162.159.192.1:2408, 1.1.1.1") },
+                    isError = customMissing,
                     supportingText = {
-                        Text("Blank scans the built-in WARP ranges")
+                        Text(
+                            text = when {
+                                customMissing ->
+                                    "Add at least one target for the Custom preset"
+                                preset == "custom" ->
+                                    "${targets.size} target${if (targets.size == 1) "" else "s"}" +
+                                        " · scanned instead of the WARP ranges"
+                                else ->
+                                    "Used by the Custom preset · blank scans the WARP ranges"
+                            },
+                            color = if (customMissing) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     },
                     minLines = 1,
                     maxLines = 3,
@@ -152,7 +193,7 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                         if (running) {
                             container.scan.cancel()
                         } else {
-                            container.scan.start(preset, parseTargets(customTargets))
+                            startScan()
                         }
                     },
                     modifier = Modifier
@@ -239,7 +280,7 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            TextButton(onClick = { container.scan.start(preset, parseTargets(customTargets)) }) {
+                            TextButton(onClick = { startScan() }) {
                                 Text("Retry")
                             }
                         }

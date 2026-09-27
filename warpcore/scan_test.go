@@ -32,6 +32,38 @@ func TestResolvePresets(t *testing.T) {
 			t.Errorf("%s missing ports", tc.name)
 		}
 	}
+	// The custom preset scans only the explicit targets and never falls
+	// back to the built-in ranges.
+	custom, err := resolveConfig(ScanConfig{Preset: "custom", Targets: []string{"192.0.2.1:2408"}})
+	if err != nil {
+		t.Fatalf("custom: %v", err)
+	}
+	if custom.Probes != 2 || custom.TimeoutMs != 1500 || custom.Workers != 64 {
+		t.Errorf("custom defaults = probes %d timeout %d workers %d, want 2/1500/64",
+			custom.Probes, custom.TimeoutMs, custom.Workers)
+	}
+	if len(custom.Ranges) != 0 {
+		t.Errorf("custom must not fall back to default ranges: %v", custom.Ranges)
+	}
+	if tgts, err := buildTargets(custom); err != nil || len(tgts) != 1 {
+		t.Errorf("custom targets = %d (%v), want 1", len(tgts), err)
+	}
+	if _, err := PresetConfig("custom"); err != nil {
+		t.Errorf("PresetConfig(custom): %v", err)
+	}
+
+	// Custom without targets must fail loudly instead of scanning ranges.
+	empty, err := resolveConfig(ScanConfig{Preset: "custom"})
+	if err != nil {
+		t.Fatalf("custom empty: %v", err)
+	}
+	if len(empty.Ranges) != 0 {
+		t.Errorf("custom without targets filled ranges: %v", empty.Ranges)
+	}
+	if _, err := buildTargets(empty); err == nil {
+		t.Error("custom without targets should produce no scan targets")
+	}
+
 	if _, err := resolveConfig(ScanConfig{Preset: "bogus"}); err == nil {
 		t.Fatal("unknown preset accepted")
 	}

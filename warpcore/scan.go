@@ -84,8 +84,8 @@ type ScanResult struct {
 	Results    []EndpointResult `json:"results"`
 }
 
-// PresetConfig resolves a preset name ("quick", "standard", "deep") into a
-// concrete scan configuration exposed as JSON.
+// PresetConfig resolves a preset name ("quick", "standard", "deep",
+// "custom") into a concrete scan configuration exposed as JSON.
 func PresetConfig(name string) (string, error) {
 	cfg, err := resolveConfig(ScanConfig{Preset: name})
 	if err != nil {
@@ -119,12 +119,20 @@ func resolveConfig(cfg ScanConfig) (ScanConfig, error) {
 		applyIfZero(&cfg.TimeoutMs, 2000)
 		applyIfZero(&cfg.Probes, 3)
 		applyIfZero(&cfg.Workers, 96)
+	case "custom":
+		// Only the caller's explicit targets are scanned — no built-in
+		// range fallback. Probe parameters default to the standard values
+		// and may still be overridden per call.
+		applyIfZero(&cfg.Count, 4096)
+		applyIfZero(&cfg.TimeoutMs, 1500)
+		applyIfZero(&cfg.Probes, 2)
+		applyIfZero(&cfg.Workers, 64)
 	default:
 		return cfg, fmt.Errorf("unknown preset %q", name)
 	}
 	cfg.Preset = name
 
-	if len(cfg.Ranges) == 0 && len(cfg.Targets) == 0 {
+	if name != "custom" && len(cfg.Ranges) == 0 && len(cfg.Targets) == 0 {
 		cfg.Ranges = append([]string{}, defaultRanges...)
 	}
 	if len(cfg.Ports) == 0 {
