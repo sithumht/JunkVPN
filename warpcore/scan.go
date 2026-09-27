@@ -39,6 +39,12 @@ type ScanConfig struct {
 	TimeoutMs int      `json:"timeoutMs,omitempty"`
 	Probes    int      `json:"probes,omitempty"`
 	Workers   int      `json:"workers,omitempty"`
+	// Account is the registered WARP account JSON. When present, handshake
+	// probes use the account's identity, so WireGuard responders that only
+	// answer registered keys (including real WARP edges) respond to the
+	// scan instead of dropping it. Scans without an account fall back to a
+	// throwaway identity that still measures any open responder.
+	Account string `json:"account,omitempty"`
 }
 
 // ScanEvents receives progress from a running scan. Implementations are
@@ -347,8 +353,9 @@ func (s *Scan) Run() (string, error) {
 	s.emit(func(e ScanEvents) { e.OnStart(len(targets)) })
 
 	timeout := time.Duration(s.cfg.TimeoutMs) * time.Millisecond
-	identity, idErr := newIdentity()
-	if idErr != nil {
+	identity, peerPub := s.identity()
+	if identity == nil {
+		idErr := fmt.Errorf("identity unavailable")
 		s.emitError("identity: " + idErr.Error())
 		return "", idErr
 	}
@@ -367,7 +374,7 @@ func (s *Scan) Run() (string, error) {
 				if s.ctx.Err() != nil {
 					continue
 				}
-				res := s.probeTarget(t, identity, timeout)
+				res := s.probeTarget(t, identity, peerPub, timeout)
 				outcomes <- scanOutcome{res: res}
 
 				mu.Lock()
@@ -421,16 +428,39 @@ func (s *Scan) Run() (string, error) {
 	return string(out), nil
 }
 
+// identity picks the key material handshake probes run with: the
+// registered account when one is configured and readable, otherwise a
+// throwaway identity plus the well known WARP peer key.
+func (s *Scan) identity() (*wgIdentity, string) {
+	if s.cfg.Account != "" {
+		var acc Account
+		if err := json.Unmarshal([]byte(s.cfg.Account), &acc); err == nil && acc.PrivateKey != "" {
+			if id, err := identityFromPrivate(acc.PrivateKey); err == nil {
+				peer := acc.PeerPublicKey
+				if peer == "" {
+					peer = warpPeerPublicKey
+				}
+				return id, peer
+			}
+		}
+	}
+	id, err := newIdentity()
+	if err != nil {
+		return nil, ""
+	}
+	return id, warpPeerPublicKey
+}
+
 // probeTarget measures one candidate: first with a real WireGuard handshake,
 // then with a plain TCP connect as a reachability fallback.
-func (s *Scan) probeTarget(t target, identity *wgIdentity, timeout time.Duration) EndpointResult {
+func (s *Scan) probeTarget(t target, identity *wgIdentity, peerPub string, timeout time.Duration) EndpointResult {
 	res := EndpointResult{
 		Endpoint: t.endpoint(),
 		IP:       t.ip.String(),
 		Port:     t.port,
 	}
 
-	stats, _ := wgProbe(s.ctx, t.endpoint(), identity, timeout, s.cfg.Probes)
+	stats, _ := wgProbeTo(s.ctx, t.endpoint(), identity, peerPub, timeout, s.cfg.Probes)
 	if stats != nil && stats.ok() {
 		avg, jitter, loss, attempts := stats.summary()
 		res.Mode = "wg"

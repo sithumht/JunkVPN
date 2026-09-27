@@ -22,6 +22,10 @@ All code in this repository is original.
   is alive. Handshake-confirmed endpoints always rank first.
 - **Live results** — progress, per-endpoint latency, jitter, and loss stream
   into the UI while the scan runs.
+- **Identity verification** — one tap proves an endpoint will actually accept
+  *your* account: the app completes a full WireGuard handshake with the
+  registered keys, and only a peer holding the real WARP private key answers
+  with a valid authenticator. Works per endpoint and for the best pick.
 - **WARP account** — registers a device through the public WARP API. The
   private key is generated on-device and stored **encrypted with the Android
   Keystore**; only the public key is sent to Cloudflare.
@@ -42,7 +46,9 @@ All code in this repository is original.
    (`162.159.192/193/195.0/24`, `188.114.96–99.0/24`) across the usual
    WireGuard ports (2408, 500, 4500, 1701).
 2. Each candidate gets a real WireGuard handshake attempt — a valid reply
-   means a live, usable endpoint and yields a true RTT.
+   means a live, usable endpoint and yields a true RTT. When a WARP account
+   is registered, probes use its identity, so edges that only answer
+   registered keys respond to the scan.
 3. If the handshake fails, a TCP connect to port 443 is measured as a
    reachability fallback (marked `TCP` in the results).
 4. Results are ranked: `WG` confirmed first by RTT, then `TCP` reachable.
@@ -55,6 +61,7 @@ JunkVPN/
 │   ├── scan.go          target expansion, worker pool, ranking
 │   ├── wireguard.go     Noise-ish handshake built on BLAKE2s + Curve25519
 │   ├── probe.go         UDP handshake + TCP connect probes, jitter/loss stats
+│   ├── verify.go        account identity verification (authenticated handshake)
 │   ├── warpapi.go       WARP device registration client
 │   ├── wgconfig.go      WireGuard / AmneziaWG config rendering
 │   └── *_test.go        unit tests + end-to-end handshake vs. wireguard-go

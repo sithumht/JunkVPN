@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -67,6 +68,7 @@ private fun parseTargets(raw: String): List<String> =
 @Composable
 fun ScanScreen(container: Container, toast: (String) -> Unit) {
     val state by container.scan.state.collectAsState()
+    val verifyStates by container.scan.verify.collectAsState()
     val defaultPreset by container.settings.defaultPreset.collectAsState()
     var preset by rememberSaveable { mutableStateOf(defaultPreset) }
     var customTargets by rememberSaveable { mutableStateOf("") }
@@ -246,7 +248,17 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
             }
 
             if (finished) {
-                item(key = "summary") { ScanSummaryCard(state, context, toast) }
+                item(key = "summary") {
+                    state.summary?.let { summary ->
+                        ScanSummaryCard(
+                            state = state,
+                            context = context,
+                            toast = toast,
+                            verifyState = verifyStates[summary.best],
+                            onVerify = { container.scan.verify(summary.best) },
+                        )
+                    }
+                }
             }
 
             if (display.isEmpty()) {
@@ -308,6 +320,8 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                             copyToClipboard(context, "Endpoint", item.endpoint)
                             toast("Copied ${item.endpoint}")
                         },
+                        verifyState = verifyStates[item.endpoint],
+                        onVerify = { container.scan.verify(item.endpoint) },
                     )
                 }
             }
@@ -320,6 +334,8 @@ private fun ScanSummaryCard(
     state: com.junkvpn.app.data.ScanUiState,
     context: android.content.Context,
     toast: (String) -> Unit,
+    verifyState: com.junkvpn.app.core.VerifyState?,
+    onVerify: () -> Unit,
 ) {
     val summary = state.summary ?: return
     Card(
@@ -355,13 +371,32 @@ private fun ScanSummaryCard(
                     )
                     ModeBadge(mode = state.results.firstOrNull { it.endpoint == summary.best }?.mode ?: "tcp")
                 }
-                TextButton(onClick = {
-                    copyToClipboard(context, "Best endpoint", summary.best)
-                    toast("Copied ${summary.best}")
-                }) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Copy best endpoint")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    TextButton(onClick = {
+                        copyToClipboard(context, "Best endpoint", summary.best)
+                        toast("Copied ${summary.best}")
+                    }) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Copy")
+                    }
+                    val verifying = verifyState is com.junkvpn.app.core.VerifyState.Running
+                    TextButton(onClick = onVerify, enabled = !verifying) {
+                        Icon(Icons.Outlined.VerifiedUser, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (verifying) "Verifying…" else "Verify identity")
+                    }
+                }
+                (verifyState as? com.junkvpn.app.core.VerifyState.Done)?.let { done ->
+                    Text(
+                        text = done.result.message(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (done.result.ok) MaterialTheme.colorScheme.tertiary
+                        else MaterialTheme.colorScheme.error,
+                    )
                 }
             }
             Text(

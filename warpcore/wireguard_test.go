@@ -42,9 +42,12 @@ func TestBuildInitiationShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("identity: %v", err)
 	}
-	msg, err := buildInitiation(id, warpPeerPublicKey, 0x11223344, time.Now())
+	msg, st, err := buildInitiation(id, warpPeerPublicKey, 0x11223344, time.Now())
 	if err != nil {
 		t.Fatalf("build: %v", err)
+	}
+	if st == nil || len(st.ck) != 32 || len(st.h) != 32 || st.eph == nil || st.id != id {
+		t.Fatal("handshake state not preserved for response validation")
 	}
 	if len(msg) != initiationSize {
 		t.Fatalf("initiation is %d bytes, want %d", len(msg), initiationSize)
@@ -74,7 +77,7 @@ func TestBuildInitiationShape(t *testing.T) {
 	}
 
 	// A different sender index must change the message.
-	other, err := buildInitiation(id, warpPeerPublicKey, 0x55667788, time.Now())
+	other, _, err := buildInitiation(id, warpPeerPublicKey, 0x55667788, time.Now())
 	if err != nil {
 		t.Fatalf("build 2: %v", err)
 	}

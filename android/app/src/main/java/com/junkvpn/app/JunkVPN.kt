@@ -23,5 +23,5 @@ class Container(context: Context) {
     val settings = SettingsStore(context)
     val account = AccountStore(context)
     val history = HistoryStore(context)
-    val scan = ScanRepository(history, settings)
+    val scan = ScanRepository(history, settings, account)
 }

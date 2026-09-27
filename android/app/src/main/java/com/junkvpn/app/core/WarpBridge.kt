@@ -25,6 +25,14 @@ object WarpBridge {
     suspend fun buildConfig(kind: String, accountJson: String, optsJson: String = ""): String =
         call { Warpcore.buildConfig(kind, accountJson, optsJson) }
 
+    /**
+     * Sends real WireGuard handshakes to [endpoint] using the account's
+     * registered keys and returns the VerifyResult JSON. A valid response
+     * proves the endpoint recognizes this account's identity.
+     */
+    suspend fun verify(endpoint: String, accountJson: String, timeoutMs: Long = 2000, attempts: Long = 2): String =
+        call { Warpcore.verifyEndpoint(endpoint, accountJson, timeoutMs, attempts) }
+
     fun newScan(cfgJson: String, events: ScanEvents): Scan = Warpcore.newScan(cfgJson, events)
 
     private suspend fun <T> call(block: () -> T): T = withContext(Dispatchers.IO) { block() }

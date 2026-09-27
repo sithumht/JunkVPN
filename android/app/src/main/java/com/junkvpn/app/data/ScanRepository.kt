@@ -2,6 +2,8 @@ package com.junkvpn.app.data
 
 import com.junkvpn.app.core.EndpointUi
 import com.junkvpn.app.core.ScanSummary
+import com.junkvpn.app.core.VerifyState
+import com.junkvpn.app.core.VerifyUi
 import com.junkvpn.app.core.WarpBridge
 import com.junkvpn.app.core.parseScanResult
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +48,7 @@ data class ScanUiState(
 class ScanRepository(
     private val history: HistoryStore,
     private val settings: SettingsStore,
+    private val account: AccountStore,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,6 +62,10 @@ class ScanRepository(
     private val _state = MutableStateFlow(ScanUiState())
     val state: StateFlow<ScanUiState> = _state.asStateFlow()
 
+    /** Verification lifecycle per endpoint key ("ip:port"). */
+    private val _verify = MutableStateFlow<Map<String, VerifyState>>(emptyMap())
+    val verify: StateFlow<Map<String, VerifyState>> = _verify.asStateFlow()
+
     fun start(preset: String, targets: List<String>) {
         // Claim the running flag synchronously so a double-tap can't start two scans.
         synchronized(lock) {
@@ -66,6 +73,7 @@ class ScanRepository(
             _state.value = ScanUiState(running = true, preset = preset)
             liveList = emptyList()
             lastEmitMs = 0L
+            _verify.value = emptyMap()
         }
         scope.launch { run(preset, targets) }
     }
@@ -74,11 +82,44 @@ class ScanRepository(
         synchronized(lock) { scan }?.cancel()
     }
 
+    /**
+     * Verifies [endpoint] with the registered account identity: the core
+     * completes a full WireGuard handshake and only an endpoint that
+     * recognizes the account's key answers with a valid authenticator.
+     */
+    fun verify(endpoint: String) {
+        if (endpoint.isEmpty()) return
+        synchronized(lock) {
+            if (_verify.value[endpoint] != null) return
+            _verify.value = _verify.value + (endpoint to VerifyState.Running)
+        }
+        scope.launch {
+            val result = runCatching {
+                WarpBridge.verify(endpoint, account.state.value.orEmpty())
+            }.fold(
+                onSuccess = { VerifyUi.parse(it) },
+                onFailure = { e ->
+                    VerifyUi(
+                        ok = false,
+                        code = "error",
+                        rttMs = 0.0,
+                        mac1 = false,
+                        detail = e.message ?: e.toString(),
+                    )
+                },
+            )
+            _verify.update { it + (endpoint to VerifyState.Done(result)) }
+        }
+    }
+
     private suspend fun run(preset: String, targets: List<String>) {
         try {
             val cfgJson = JSONObject().apply {
                 put("preset", preset)
                 if (targets.isNotEmpty()) put("targets", JSONArray(targets))
+                // Probe with the account identity so responders that only
+                // answer registered keys respond to the scan.
+                account.state.value?.takeIf { it.isNotBlank() }?.let { put("account", it) }
             }.toString()
 
             val session = WarpBridge.newScan(cfgJson, Events(this))

@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +31,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.junkvpn.app.core.EndpointUi
+import com.junkvpn.app.core.VerifyState
 import java.util.Locale
 
 fun formatLatency(ms: Double?): String {
@@ -65,6 +70,8 @@ fun EndpointCard(
     highlighted: Boolean,
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
+    verifyState: VerifyState? = null,
+    onVerify: (() -> Unit)? = null,
 ) {
     val container = when {
         highlighted -> MaterialTheme.colorScheme.primaryContainer
@@ -120,6 +127,25 @@ fun EndpointCard(
                         )
                     }
                 }
+                when (verifyState) {
+                    is VerifyState.Running -> Text(
+                        text = "Verifying identity with your account…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    is VerifyState.Done -> Text(
+                        text = verifyState.result.message(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (verifyState.result.ok) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    null -> {}
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -133,6 +159,32 @@ fun EndpointCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (onVerify != null) {
+                val running = verifyState is VerifyState.Running
+                IconButton(onClick = onVerify, enabled = !running) {
+                    when {
+                        running -> CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        (verifyState as? VerifyState.Done)?.result?.ok == true -> Icon(
+                            imageVector = Icons.Filled.Verified,
+                            contentDescription = "Identity verified for ${item.endpoint}",
+                            tint = MaterialTheme.colorScheme.secondary,
+                        )
+                        verifyState != null -> Icon(
+                            imageVector = Icons.Filled.ErrorOutline,
+                            contentDescription = "Verification failed for ${item.endpoint}",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        else -> Icon(
+                            imageVector = Icons.Outlined.VerifiedUser,
+                            contentDescription = "Verify ${item.endpoint} with your account",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             IconButton(onClick = onCopy) {
                 Icon(

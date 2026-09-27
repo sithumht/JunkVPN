@@ -92,3 +92,38 @@ fun parseScanResult(json: String): Pair<ScanSummary, List<EndpointUi>> {
     )
     return summary to results
 }
+
+/** Result of an identity verification, parsed from warpcore.VerifyEndpoint. */
+data class VerifyUi(
+    val ok: Boolean,
+    val code: String,
+    val rttMs: Double,
+    val mac1: Boolean,
+    val detail: String,
+) {
+    /** Human line shown under the endpoint or in the summary card. */
+    fun message(): String = when {
+        ok -> "Verified · %.1f ms — peer accepted your account key".format(rttMs)
+        code == "no_account" -> "Create a WARP account first, then verify"
+        else -> detail.ifEmpty { "verification failed" }
+    }
+
+    companion object {
+        fun parse(json: String): VerifyUi {
+            val o = JSONObject(json)
+            return VerifyUi(
+                ok = o.optBoolean("ok"),
+                code = o.optString("code"),
+                rttMs = o.optDouble("rttMs"),
+                mac1 = o.optBoolean("mac1"),
+                detail = o.optString("detail"),
+            )
+        }
+    }
+}
+
+/** Per-endpoint verification lifecycle used by the results list. */
+sealed interface VerifyState {
+    data object Running : VerifyState
+    data class Done(val result: VerifyUi) : VerifyState
+}
