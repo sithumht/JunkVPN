@@ -4,6 +4,9 @@ An Android app that finds the fastest working **Cloudflare WARP** endpoints for
 your network, registers a WARP device account, and exports ready-to-import
 **WireGuard** / **AmneziaWG** tunnel configs.
 
+**Website:** [sithumht.github.io/JunkVPN](https://sithumht.github.io/JunkVPN/) —
+landing page with screenshots, features, and install guide.
+
 The heavy lifting lives in a Go core compiled to Android native code with
 gomobile; the UI is a fresh Material 3 design written in Jetpack Compose.
 All code in this repository is original.
