@@ -144,7 +144,10 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                                 if (n == 0) "your targets · required"
                                 else "$n target${if (n == 1) "" else "s"} · 2 probes · 1.5s"
                             }
-                            else -> presetOptions.firstOrNull { it.id == preset }?.detail.orEmpty()
+                            else -> {
+                                val base = presetOptions.firstOrNull { it.id == preset }?.detail.orEmpty()
+                                if (customTargets.isNotBlank()) "$base · custom targets ignored" else base
+                            }
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -152,39 +155,36 @@ fun ScanScreen(container: Container, toast: (String) -> Unit) {
                 }
             }
 
-            item(key = "targets") {
-                val targets = parseTargets(customTargets)
-                val customMissing = preset == "custom" && targets.isEmpty()
-                OutlinedTextField(
-                    value = customTargets,
-                    onValueChange = { raw ->
-                        customTargets = raw
-                        // Typing targets selects the Custom preset for you.
-                        if (raw.isNotBlank() && preset != "custom") preset = "custom"
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    label = { Text("Custom targets") },
-                    placeholder = { Text("162.159.192.1:2408, 1.1.1.1") },
-                    isError = customMissing,
-                    supportingText = {
-                        Text(
-                            text = when {
-                                customMissing ->
+            // The targets box belongs to the Custom preset only; hidden
+            // text is kept and reused when Custom is selected again.
+            if (preset == "custom") {
+                item(key = "targets") {
+                    val targets = parseTargets(customTargets)
+                    val customMissing = targets.isEmpty()
+                    OutlinedTextField(
+                        value = customTargets,
+                        onValueChange = { customTargets = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        label = { Text("Custom targets") },
+                        placeholder = { Text("162.159.192.1:2408, 1.1.1.1") },
+                        isError = customMissing,
+                        supportingText = {
+                            Text(
+                                text = if (customMissing) {
                                     "Add at least one target for the Custom preset"
-                                preset == "custom" ->
+                                } else {
                                     "${targets.size} target${if (targets.size == 1) "" else "s"}" +
                                         " · scanned instead of the WARP ranges"
-                                else ->
-                                    "Used by the Custom preset · blank scans the WARP ranges"
-                            },
-                            color = if (customMissing) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                    minLines = 1,
-                    maxLines = 3,
-                )
+                                },
+                                color = if (customMissing) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        minLines = 1,
+                        maxLines = 3,
+                    )
+                }
             }
 
             item(key = "action") {
